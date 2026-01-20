@@ -26,7 +26,7 @@ export default function ChessCryptFileTool() {
       formData.append("use_hidden_expiry", "true");
     }
 
-    const url = action === "encode" ? "http://127.0.0.1:8000/encode" : "http://127.0.0.1:8000/decode";
+    const url = action === "encode" ? "https://chess-encryption-api-production.up.railway.app/encode" : "https://chess-encryption-api-production.up.railway.app/decode";
 
     for(const[key , value] of formData.entries()){
       console.log("key:"+key+"--"+"Value"+value);
