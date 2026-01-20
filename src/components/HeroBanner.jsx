@@ -32,7 +32,7 @@ export default function HeroBanner() {
         items-center justify-center
         px-4 sm:px-6 md:px-12 lg:px-20
         py-8 md:py-12 lg:py-16
-        mt-30
+        
         relative bg-cover bg-center bg-no-repeat
       "
       style={{
