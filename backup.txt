@@ -1,0 +1,703 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Chessboard } from 'react-chessboard';
+import { Chess } from 'chess.js';
+
+const ChessSteganographyVisualizer = () => {
+  // State variables
+  const [boardPosition, setBoardPosition] = useState('start'); // This controls the chessboard position
+  const [fileByteArray, setFileByteArray] = useState([]);
+  const [currentBitIndex, setCurrentBitIndex] = useState(0);
+  const [totalBits, setTotalBits] = useState(0);
+  const [gameCount, setGameCount] = useState(0);
+  const [moveCount, setMoveCount] = useState(0);
+  const [processingSpeed, setProcessingSpeed] = useState(300);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedFileType, setSelectedFileType] = useState('text');
+  const [movesList, setMovesList] = useState([]);
+  const [encodingInfo, setEncodingInfo] = useState({
+    legalMoves: 0,
+    maxBits: 0,
+    message: 'Waiting to start...'
+  });
+  const [fileInfo, setFileInfo] = useState({
+    name: null,
+    size: null,
+    type: null
+  });
+  const [binaryView, setBinaryView] = useState('Binary data will appear here');
+  const [progressPercent, setProgressPercent] = useState(0);
+
+  // Refs for real-time updates
+  const processingIntervalRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const moveIdCounter = useRef(0);
+  const chessGameRef = useRef(null); // Will hold the Chess.js instance
+  const currentBitIndexRef = useRef(currentBitIndex);
+  const isProcessingRef = useRef(isProcessing);
+  const moveCountRef = useRef(moveCount);
+  const gameCountRef = useRef(gameCount);
+
+  // Initialize chess game
+  useEffect(() => {
+    try {
+      chessGameRef.current = new Chess();
+      console.log('Chess game initialized');
+    } catch (error) {
+      console.error('Error initializing chess:', error);
+      chessGameRef.current = null;
+    }
+  }, []);
+
+  // Sync refs with state
+  useEffect(() => {
+    currentBitIndexRef.current = currentBitIndex;
+  }, [currentBitIndex]);
+
+  useEffect(() => {
+    isProcessingRef.current = isProcessing;
+  }, [isProcessing]);
+
+  useEffect(() => {
+    moveCountRef.current = moveCount;
+  }, [moveCount]);
+
+  useEffect(() => {
+    gameCountRef.current = gameCount;
+  }, [gameCount]);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (processingIntervalRef.current) {
+        clearInterval(processingIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Process loop
+  const processLoop = () => {
+    if (!isProcessingRef.current || !chessGameRef.current) return;
+    processNextMove();
+  };
+
+  // Reset visualization
+  const resetVisualization = () => {
+    if (processingIntervalRef.current) {
+      clearInterval(processingIntervalRef.current);
+      processingIntervalRef.current = null;
+    }
+
+    try {
+      chessGameRef.current = new Chess();
+      setBoardPosition(chessGameRef.current.fen());
+    } catch (error) {
+      console.error('Error resetting chess game:', error);
+      chessGameRef.current = null;
+    }
+    
+    setFileByteArray([]);
+    setCurrentBitIndex(0);
+    currentBitIndexRef.current = 0;
+    setTotalBits(0);
+    setGameCount(0);
+    gameCountRef.current = 0;
+    setMoveCount(0);
+    moveCountRef.current = 0;
+    setIsProcessing(false);
+    isProcessingRef.current = false;
+    setMovesList([]);
+    setEncodingInfo({
+      legalMoves: 0,
+      maxBits: 0,
+      message: 'Waiting to start...'
+    });
+    setFileInfo({
+      name: null,
+      size: null,
+      type: null
+    });
+    setBinaryView('Binary data will appear here');
+    setProgressPercent(0);
+    moveIdCounter.current = 0;
+  };
+
+  // Update progress
+  const updateProgress = (percent) => {
+    setProgressPercent(Math.min(100, Math.max(0, percent)));
+  };
+
+  // Add move to list
+  const addMoveToList = (move, bits) => {
+    const newMove = {
+      id: moveIdCounter.current++,
+      moveNumber: moveCountRef.current,
+      notation: move,
+      bits: bits,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    setMovesList(prev => [newMove, ...prev.slice(0, 9)]); // Keep only last 10 moves
+  };
+
+  // Extract bits from file data
+  const extractBits = (index, count) => {
+    if (index >= totalBits || index < 0) return null;
+    if (fileByteArray.length === 0) return null;
+
+    let result = '';
+    for (let i = 0; i < count && index + i < totalBits; i++) {
+      const byteIndex = Math.floor((index + i) / 8);
+      const bitOffset = 7 - ((index + i) % 8);
+      
+      if (byteIndex >= 0 && byteIndex < fileByteArray.length) {
+        const bit = (fileByteArray[byteIndex] >> bitOffset) & 1;
+        result += bit;
+      } else {
+        result += '0';
+      }
+    }
+    return result;
+  };
+
+  // Get legal moves and encoding info
+  const getLegalMovesAndEncodeInfo = () => {
+    try {
+      if (!chessGameRef.current) {
+        return { legalMoves: [], maxBits: 0 };
+      }
+      
+      const possibleMoves = chessGameRef.current.moves({ verbose: true });
+      const legalMoves = [...possibleMoves];
+      const maxBits = legalMoves.length > 0 ? Math.floor(Math.log2(legalMoves.length)) : 0;
+
+      let message = encodingInfo.message;
+      if (legalMoves.length <= 1) {
+        message = legalMoves.length === 0 ? 'No legal moves available.' : 'Forced move available.';
+      }
+
+      setEncodingInfo({
+        legalMoves: legalMoves.length,
+        maxBits,
+        message
+      });
+
+      return { legalMoves, maxBits };
+    } catch (error) {
+      console.error('Error getting legal moves:', error);
+      return { legalMoves: [], maxBits: 0 };
+    }
+  };
+
+  // Check if game is over
+  const isGameOver = () => {
+    try {
+      if (!chessGameRef.current) return true;
+      return chessGameRef.current.isGameOver();
+    } catch (error) {
+      console.error('Error checking game over:', error);
+      return true;
+    }
+  };
+
+  // Start a new game
+  const startNewGame = () => {
+    try {
+      const newGameCount = gameCountRef.current + 1;
+      setGameCount(newGameCount);
+      gameCountRef.current = newGameCount;
+      
+      chessGameRef.current = new Chess();
+      setBoardPosition(chessGameRef.current.fen());
+      
+      setMoveCount(0);
+      moveCountRef.current = 0;
+      
+      setEncodingInfo(prev => ({
+        ...prev,
+        message: `Starting game ${newGameCount}`
+      }));
+      
+      console.log(`Started new game ${newGameCount}`);
+      return true;
+    } catch (error) {
+      console.error('Error starting new game:', error);
+      return false;
+    }
+  };
+
+  // Process next move
+  const processNextMove = () => {
+    if (!isProcessingRef.current || !chessGameRef.current) return;
+
+    // Check if encoding is complete
+    if (currentBitIndexRef.current >= totalBits) {
+      if (processingIntervalRef.current) {
+        clearInterval(processingIntervalRef.current);
+        processingIntervalRef.current = null;
+      }
+      setEncodingInfo(prev => ({
+        ...prev,
+        message: '🎉 Encoding complete! All bits processed.'
+      }));
+      updateProgress(100);
+      setIsProcessing(false);
+      isProcessingRef.current = false;
+      return;
+    }
+
+    // Check for game over or move limit
+    if (isGameOver() || chessGameRef.current.history().length >= 50) {
+      startNewGame();
+      return;
+    }
+
+    const { legalMoves, maxBits } = getLegalMovesAndEncodeInfo();
+
+    // Check for no legal moves
+    if (legalMoves.length === 0) {
+      startNewGame();
+      return;
+    }
+
+    if (legalMoves.length === 1) {
+      // Make forced move
+      try {
+        chessGameRef.current.move(legalMoves[0]);
+        setBoardPosition(chessGameRef.current.fen());
+        
+        const newMoveCount = moveCountRef.current + 1;
+        setMoveCount(newMoveCount);
+        moveCountRef.current = newMoveCount;
+        
+        addMoveToList(legalMoves[0].san, 'forced');
+        
+        console.log(`Forced move: ${legalMoves[0].san}`);
+      } catch (error) {
+        console.error('Error making forced move:', error);
+        startNewGame();
+      }
+      return;
+    }
+
+    // Encode bits in this position
+    const bitsToEncode = Math.min(maxBits, totalBits - currentBitIndexRef.current);
+    const bits = extractBits(currentBitIndexRef.current, bitsToEncode);
+    
+    if (!bits) {
+      console.error('Failed to extract bits');
+      return;
+    }
+    
+    const moveIndex = bits.length > 0 ? parseInt(bits, 2) % legalMoves.length : 0;
+
+    // Update binary view
+    let binaryViewHtml = '';
+    const startIdx = Math.max(0, currentBitIndexRef.current - 16);
+    const endIdx = Math.min(totalBits, currentBitIndexRef.current + 16);
+    
+    for (let i = startIdx; i < endIdx; i++) {
+      const bit = extractBits(i, 1) || '0';
+      if (i >= currentBitIndexRef.current && i < currentBitIndexRef.current + bitsToEncode) {
+        binaryViewHtml += `<span style="color: #e94560; font-weight: bold;">${bit}</span>`;
+      } else {
+        binaryViewHtml += bit;
+      }
+
+      if ((i + 1) % 8 === 0) binaryViewHtml += ' ';
+    }
+    setBinaryView(binaryViewHtml || 'No binary data');
+
+    // Make the encoded move
+    if (legalMoves[moveIndex]) {
+      try {
+        chessGameRef.current.move(legalMoves[moveIndex]);
+        setBoardPosition(chessGameRef.current.fen());
+        
+        // Update move count
+        const newMoveCount = moveCountRef.current + 1;
+        setMoveCount(newMoveCount);
+        moveCountRef.current = newMoveCount;
+        
+        // Update bit index
+        const nextBitIndex = currentBitIndexRef.current + bitsToEncode;
+        setCurrentBitIndex(nextBitIndex);
+        currentBitIndexRef.current = nextBitIndex;
+        
+        // Add move to list
+        addMoveToList(legalMoves[moveIndex].san, bits);
+
+        // Update progress
+        const newProgressPercent = Math.floor((nextBitIndex / totalBits) * 100);
+        updateProgress(newProgressPercent);
+
+        // Update encoding info
+        setEncodingInfo(prev => ({
+          ...prev,
+          message: `Game ${gameCountRef.current}, Move ${newMoveCount}: Encoded ${bitsToEncode} bit(s) → ${legalMoves[moveIndex].san}`
+        }));
+
+        console.log(`Move ${newMoveCount}: ${legalMoves[moveIndex].san} (bits: ${bits})`);
+      } catch (error) {
+        console.error('Error making move:', error);
+        // If move fails, start new game
+        startNewGame();
+      }
+    }
+  };
+
+  // Start visualization
+  const startVisualization = () => {
+    const file = fileInputRef.current?.files[0];
+    if (!file) {
+      alert('Please select a file first.');
+      return;
+    }
+
+    resetVisualization();
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const arrayBuffer = e.target.result;
+        const byteArray = new Uint8Array(arrayBuffer);
+        
+        setFileByteArray(byteArray);
+        const totalBitsCount = byteArray.length * 8;
+        setTotalBits(totalBitsCount);
+        
+        setFileInfo({
+          name: file.name,
+          size: file.size,
+          type: selectedFileType
+        });
+
+        // Initialize first game
+        startNewGame();
+        
+        setIsProcessing(true);
+        isProcessingRef.current = true;
+
+        // Start processing interval
+        processingIntervalRef.current = setInterval(() => {
+          processLoop();
+        }, processingSpeed);
+
+        setEncodingInfo(prev => ({
+          ...prev,
+          message: `Processing ${file.name} (${totalBitsCount} bits)...`
+        }));
+
+        console.log(`Started processing: ${file.name}, ${totalBitsCount} bits`);
+      } catch (error) {
+        console.error('Error processing file:', error);
+        alert('Error processing file. Please try again.');
+      }
+    };
+
+    reader.onerror = (error) => {
+      console.error('File reading error:', error);
+      alert('Error reading file. Please try again.');
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Handle speed change
+  const handleSpeedChange = (e) => {
+    const newSpeed = parseInt(e.target.value);
+    setProcessingSpeed(newSpeed);
+
+    // Update interval if processing
+    if (isProcessingRef.current && processingIntervalRef.current) {
+      clearInterval(processingIntervalRef.current);
+      processingIntervalRef.current = setInterval(() => {
+        processLoop();
+      }, newSpeed);
+    }
+  };
+
+  // Get current game status
+  const getGameStatus = () => {
+    try {
+      if (!chessGameRef.current) return 'Initializing...';
+      
+      if (chessGameRef.current.isGameOver()) {
+        if (chessGameRef.current.isCheckmate()) return 'Checkmate';
+        if (chessGameRef.current.isStalemate()) return 'Stalemate';
+        if (chessGameRef.current.isThreefoldRepetition()) return 'Threefold Repetition';
+        if (chessGameRef.current.isInsufficientMaterial()) return 'Insufficient Material';
+        if (chessGameRef.current.isDraw()) return 'Draw';
+        return 'Game Over';
+      }
+      return 'In Progress';
+    } catch (error) {
+      return 'Error';
+    }
+  };
+
+  // Render component
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 text-white">
+      {/* Navigation Bar */}
+      <nav className="fixed top-0 left-0 right-0 bg-gray-900/90 backdrop-blur-lg z-50 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <div className="text-2xl font-bold text-white">
+                <span className="bg-gradient-to-r from-blue-500 to-pink-500 bg-clip-text text-transparent">
+                  Chess Crypt
+                </span>
+              </div>
+            </div>
+            <div className="hidden md:block">
+              <div className="ml-10 flex items-baseline space-x-4">
+                <a href="/" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
+                  Home
+                </a>
+                <a href="/file_upload" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
+                  Encrypt/Decrypt
+                </a>
+                <a href="/preview" className="bg-pink-600 text-white px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105 hover:bg-pink-700">
+                  Live Preview
+                </a>
+                <a href="/visualizer" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
+                  Visualizer
+                </a>
+                <a href="/about" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
+                  About Team
+                </a>
+                <a href="/get_in_touch" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
+                  Contact
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="pt-24 pb-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700 p-6 shadow-xl">
+          {/* Header */}
+          <h1 className="text-4xl font-bold text-center mb-8">
+            <span className="bg-gradient-to-r from-white via-pink-300 to-pink-500 bg-clip-text text-transparent">
+              Chess Steganography Visualizer
+            </span>
+          </h1>
+
+          {/* Upload Section */}
+          <div className="rounded-xl p-6 mb-8 border bg-gradient-to-br from-gray-900 to-gray-800">
+            <h2 className="text-2xl font-bold mb-4 text-pink-500">
+              Upload File for Live Encryption Preview
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Select file to encrypt:
+                </label>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".txt,.png,.jpg,.jpeg"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-lg bg-gray-900 text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-600 file:text-white hover:file:bg-pink-700"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  File type:
+                </label>
+                <select
+                  value={selectedFileType}
+                  onChange={(e) => setSelectedFileType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-600 rounded-lg bg-gray-900 text-white"
+                >
+                  <option value="text">Text</option>
+                  <option value="image">Image</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Processing Speed */}
+            <div className="flex items-center space-x-4 mb-6">
+              <label className="text-sm font-medium">Processing Speed:</label>
+              <input
+                type="range"
+                id="speedControl"
+                min="50"
+                max="1000"
+                step="50"
+                value={processingSpeed}
+                onChange={handleSpeedChange}
+                className="flex-grow h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+              />
+              <span className="font-medium w-20 text-right text-pink-500">
+                {processingSpeed}ms
+              </span>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex space-x-4 mb-4">
+              <button
+                onClick={startVisualization}
+                disabled={isProcessing}
+                className="px-6 py-3 bg-pink-600 text-white font-medium rounded-lg transition-all hover:scale-105 hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isProcessing ? 'Processing...' : 'Start Visualization'}
+              </button>
+              <button
+                onClick={resetVisualization}
+                className="px-6 py-3 bg-red-600 text-white font-medium rounded-lg transition-all hover:scale-105 hover:bg-red-700"
+              >
+                Reset
+              </button>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="h-4 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-pink-600 transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="text-center mt-2 text-sm">
+              {progressPercent}% complete
+            </div>
+          </div>
+
+          {/* Visualization Container */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left Column - Chess Board */}
+            <div className="space-y-6">
+              <div className="rounded-xl p-6 border border-gray-700 bg-gray-900/50">
+                <h2 className="text-2xl font-bold mb-4 text-pink-500">
+                  Chess Board
+                </h2>
+                
+                {/* Chessboard */}
+                <div className="mb-6 flex justify-center">
+                  <div className="border-2 border-pink-500 rounded-lg overflow-hidden">
+                    <Chessboard
+                      position={boardPosition}
+                      boardWidth={400}
+                      customBoardStyle={{
+                        borderRadius: '4px'
+                      }}
+                      customDarkSquareStyle={{ backgroundColor: '#1a1a2e' }}
+                      customLightSquareStyle={{ backgroundColor: '#16213e' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Stats Panel */}
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="p-4 rounded-lg border border-gray-700 text-center bg-gray-800/50">
+                    <h4 className="text-sm mb-1 opacity-80">Game</h4>
+                    <p className="text-2xl font-bold text-pink-500">
+                      {gameCount}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-lg border border-gray-700 text-center bg-gray-800/50">
+                    <h4 className="text-sm mb-1 opacity-80">Move</h4>
+                    <p className="text-2xl font-bold text-pink-500">
+                      {moveCount}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-lg border border-gray-700 text-center bg-gray-800/50">
+                    <h4 className="text-sm mb-1 opacity-80">Progress</h4>
+                    <p className="text-2xl font-bold text-pink-500">
+                      {progressPercent}%
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-lg border border-gray-700 text-center bg-gray-800/50">
+                    <h4 className="text-sm mb-1 opacity-80">Status</h4>
+                    <p className="text-lg font-bold text-pink-500">
+                      {getGameStatus()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Latest Moves */}
+                <h3 className="text-xl font-bold mb-3">Latest Moves</h3>
+                <div className="h-48 overflow-y-auto rounded-lg border border-gray-700 p-4 bg-gray-900/30">
+                  {movesList.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {movesList.map((move) => (
+                        <div
+                          key={`move-${move.id}`}
+                          className="px-3 py-2 rounded border border-gray-700 bg-gray-800/50"
+                        >
+                          <span className="font-mono">
+                            {move.moveNumber}: {move.notation} 
+                            <span className="text-pink-400 ml-2">({move.bits})</span>
+                          </span>
+                          <span className="text-xs text-gray-400 ml-2">{move.timestamp}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 italic">No moves yet. Start visualization to see moves.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Encoding Information */}
+            <div className="space-y-6">
+              <div className="rounded-xl p-6 border border-gray-700 bg-gray-900/50">
+                <h2 className="text-2xl font-bold mb-4 text-pink-500">
+                  Encoding Information
+                </h2>
+                
+                {/* File Information */}
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold mb-3">File Information</h3>
+                  <div className="p-4 rounded-lg border border-gray-700 bg-gray-800/50">
+                    {fileInfo.name ? (
+                      <>
+                        <p className="mb-2"><span className="font-semibold text-gray-300">File name:</span> {fileInfo.name}</p>
+                        <p className="mb-2"><span className="font-semibold text-gray-300">File size:</span> {fileInfo.size} bytes ({fileInfo.size * 8} bits)</p>
+                        <p><span className="font-semibold text-gray-300">File type:</span> {fileInfo.type}</p>
+                      </>
+                    ) : (
+                      <p className="text-gray-400">No file selected</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Current Encoding Step */}
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold mb-3">Current Encoding Step</h3>
+                  <div className="p-4 rounded-lg border border-gray-700 bg-gray-800/50">
+                    <p className="mb-2"><span className="font-semibold text-gray-300">Legal moves:</span> {encodingInfo.legalMoves}</p>
+                    <p className="mb-2"><span className="font-semibold text-gray-300">Max bits per move:</span> {encodingInfo.maxBits}</p>
+                    <p className="mb-2"><span className="font-semibold text-gray-300">Bits encoded:</span> {currentBitIndex} / {totalBits}</p>
+                    <p className="mt-3 p-2 bg-gray-900 rounded text-pink-300">
+                      {encodingInfo.message}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Binary View */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">Binary View</h3>
+                  <div 
+                    className="p-4 rounded-lg border border-gray-700 font-mono h-32 overflow-y-auto bg-gray-900/30 whitespace-pre-wrap break-all"
+                  >
+                    <div dangerouslySetInnerHTML={{ __html: binaryView }} />
+                  </div>
+                  <p className="text-sm text-gray-400 mt-2">
+                    Highlighted bits are currently being encoded
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ChessSteganographyVisualizer;
