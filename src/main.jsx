@@ -8,7 +8,7 @@ import Layout from "./components/Layout";
 import ChessCryptFileTool from './pages/ChessCryptFileTool'
 import ChessVisualizer from './pages/ChessVisualizer'
 import Team from "./components/Team";
-import TeamShowcase from "./pages/TeamShowCase";
+import TeamShowCase from "./pages/TeamShowCase";
 import UploadForm from "./components/Visualization/UploadForm";
 import VisualizationPanel from "./components/Visualization/VisualizationPanel";
 import VisualizationBanner from "./components/Visualization/VisualizationBanner";
@@ -24,7 +24,7 @@ const router = createBrowserRouter(
         <Route path='/encrypt/try' element={<ChessCryptFileTool/>}/>
         <Route path='/visualizer' element={<VisualizationBanner/>}/>
         <Route path='/visualizer/try' element={<ChessVisualizer/>}/>
-        <Route path='/our-team' element={<TeamShowcase/>}/>
+        <Route path='/our-team' element={<TeamShowCase/>}/>
         
         
       </Route>

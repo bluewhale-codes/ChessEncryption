@@ -202,7 +202,7 @@ function TeamCard({ member, index }) {
   )
 }
 
-export default function TeamShowcase() {
+export default function TeamShowCase() {
   const [headerVisible, setHeaderVisible] = useState(false)
 
   useEffect(() => {
