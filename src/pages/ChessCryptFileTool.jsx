@@ -9,47 +9,100 @@ export default function ChessCryptFileTool() {
   const [enableSelfDestruct, setEnableSelfDestruct] = useState(false);
   const [duration, setDuration] = useState({ hours: 0, minutes: 10, seconds: 0 });
 
+  // Error handling
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
+
+  setError(null);
+  setSuccess(null);
+  setLoading(true);
+
+  try {
+    if (!file || !fileType) {
+      throw new Error("Please select file and file type");
+    }
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("action", action);
     formData.append("file_type", fileType);
 
-
-  
-    
     if (action === "encode" && enableSelfDestruct) {
       const totalSeconds =
-        duration.hours * 3600 + duration.minutes * 60 + duration.seconds;
+        duration.hours * 3600 +
+        duration.minutes * 60 +
+        duration.seconds;
+
+      if (totalSeconds <= 0) {
+        throw new Error("Self-destruct time must be greater than zero");
+      }
+
       formData.append("self_destruct_timer", totalSeconds);
       formData.append("use_hidden_expiry", "true");
     }
 
-    const url = action === "encode" ? "https://chess-encryption-api-production.up.railway.app/encode" : "https://chess-encryption-api-production.up.railway.app/decode";
+    const url =
+      action === "encode"
+        ? "https://chess-encryption-api-production.up.railway.app/encode"
+        : "https://chess-encryption-api-production.up.railway.app/decode";
 
-    for(const[key , value] of formData.entries()){
-      console.log("key:"+key+"--"+"Value"+value);
+    const res = await fetch(url, {
+      method: "POST",
+      body: formData,
+    });
+
+    // ❌ Backend error
+    if (!res.ok) {
+      let message = "Something went wrong";
+
+      try {
+        const data = await res.json();
+        message = data?.error || data?.message || message;
+      } catch {
+        message = `Server error (${res.status})`;
+      }
+
+      throw new Error(message);
     }
 
-    const res = await fetch(url, { method: "POST", body: formData });
-    if (!res.ok) return alert("Error processing file");
-
     const blob = await res.blob();
+
+    // ✅ Success download
     const downloadUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = downloadUrl;
-    a.download = action === "encode" ? "encrypted_file.pgn" :
-                       fileType === "text" ? "decrypted_file.txt" : "decrypted_file.png";
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+    a.download =
+      action === "encode"
+        ? "encrypted_file.pgn"
+        : fileType === "text"
+        ? "decrypted_file.txt"
+        : "decrypted_file.png";
+
+    document.body.appendChild(a);
     a.click();
-  };
+    a.remove();
+    URL.revokeObjectURL(downloadUrl);
+
+    setSuccess(
+      action === "encode"
+        ? "File encrypted successfully 🎉"
+        : "File decrypted successfully 🎉"
+    );
+  } catch (err) {
+    setError(err.message || "Unexpected error occurred");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-slate-900 to-black text-white flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
   {/* Subtle chessboard pattern background */}
+  
   <div className="absolute inset-0 opacity-5">
     <div className="absolute inset-0 bg-[linear-gradient(45deg,#b58863_25%,transparent_25%),linear-gradient(-45deg,#b58863_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f0d9b5_75%),linear-gradient(-45deg,transparent_75%,#f0d9b5_75%)] bg-[size:4rem_4rem] animate-pulse"></div>
   </div>
@@ -182,15 +235,36 @@ export default function ChessCryptFileTool() {
       </div>
       <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} className="sr-only" accept={fileType === "image" ? "image/*" : "text/*,.pgn"} />
     </label>
+    {error && (
+  <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/40 text-red-400 text-sm">
+    ❌ {error}
+  </div>
+)}
+
+{success && (
+  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 text-sm">
+    ✅ {success}
+  </div>
+)}
 
     {/* CTA Button */}
-    <button 
-      type="submit" 
-      className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-[0.98] rounded-2xl py-4 sm:py-5 px-8 font-bold text-lg sm:text-xl shadow-xl hover:shadow-2xl transition-all duration-300 ring-2 ring-emerald-500/30 hover:ring-emerald-400/50 focus:outline-none focus:ring-4 focus:ring-emerald-500/50"
-      disabled={!file}
-    >
-      {action === "encode" ? "🔒 Encrypt File" : "🔓 Decrypt File"}
-    </button>
+    <button
+  type="submit"
+  disabled={!file || loading}
+  className={`w-full rounded-2xl py-4 font-bold text-lg transition-all
+    ${
+      loading
+        ? "bg-zinc-600 cursor-not-allowed"
+        : "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+    }
+  `}
+>
+  {loading
+    ? "Processing..."
+    : action === "encode"
+    ? "🔒 Encrypt File"
+    : "🔓 Decrypt File"}
+</button>
   </form>
 </div>
 
