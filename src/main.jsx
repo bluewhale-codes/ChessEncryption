@@ -7,13 +7,10 @@ import Home from "./components/Home";
 import Layout from "./components/Layout";
 import ChessCryptFileTool from './pages/ChessCryptFileTool'
 import ChessVisualizer from './pages/ChessVisualizer'
-import Team from "./components/Team";
-import TeamShowCase from "./pages/TeamShowCase";
-import UploadForm from "./components/Visualization/UploadForm";
-import VisualizationPanel from "./components/Visualization/VisualizationPanel";
+import TeamShowCase from './pages/TeamShowCase'
 import VisualizationBanner from "./components/Visualization/VisualizationBanner";
 import IntroBanner from "./components/Visualization/IntroBanner";
-import Visual from "./pages/Visual";
+
 
 const router = createBrowserRouter(
     createRoutesFromElements(
