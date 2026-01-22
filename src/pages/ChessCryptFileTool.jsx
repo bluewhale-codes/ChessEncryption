@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Shield, Lock, Unlock, Upload, ChevronDown, ChevronUp } from "lucide-react";
-
+import api from "@/api/api";
 export default function ChessCryptFileTool() {
   const [action, setAction] = useState("encode");
   const [fileType, setFileType] = useState("");
@@ -47,29 +47,14 @@ export default function ChessCryptFileTool() {
 
     const url =
       action === "encode"
-        ? "https://chess-encryption-api-production.up.railway.app/encode"
-        : "https://chess-encryption-api-production.up.railway.app/decode";
+        ? "http://127.0.0.1:8000/encode"
+        : "http://127.0.0.1:8000/decode";
 
-    const res = await fetch(url, {
-      method: "POST",
-      body: formData,
+     const res = await api.post(url, formData, {
+      responseType: "blob",
     });
-
-    // ❌ Backend error
-    if (!res.ok) {
-      let message = "Something went wrong";
-
-      try {
-        const data = await res.json();
-        message = data?.error || data?.message || message;
-      } catch {
-        message = `Server error (${res.status})`;
-      }
-
-      throw new Error(message);
-    }
-
-    const blob = await res.blob();
+    const blob = res.data
+    
 
     // ✅ Success download
     const downloadUrl = URL.createObjectURL(blob);
@@ -93,6 +78,8 @@ export default function ChessCryptFileTool() {
         : "File decrypted successfully 🎉"
     );
   } catch (err) {
+    console.log('catch block call')
+    console.log(err);
     setError(err.message || "Unexpected error occurred");
   } finally {
     setLoading(false);

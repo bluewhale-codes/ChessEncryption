@@ -7,6 +7,7 @@ const Header = () => {
   return (
     <section className="relative w-full py-10  bg-gradient-to-br from-black via-slate-950 to-black overflow-hidden">
       {/* Background Pattern - Full coverage */}
+      
       <div className="absolute inset-0 opacity-20 pointer-events-none">
         <div className="absolute top-20 left-20 w-72 h-72 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-32 right-32 w-96 h-96 bg-gradient-to-r from-pink-500/20 to-orange-500/20 rounded-full blur-3xl animate-pulse [animation-delay:1s]"></div>
@@ -16,10 +17,11 @@ const Header = () => {
       {/* Top Navigation - Contained */}
       <nav className="relative z-50 py-4 px-6 lg:px-8 xl:px-12">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
+          
           {/* Logo - Link to Home */}
           <Link to="/" className="flex items-center gap-2 hover:no-underline focus:outline-none">
-            <div className="w-8 h-8 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center shadow-lg hover:bg-white/20 transition-all duration-200">
-              <span className="text-xs font-bold text-white">TF</span>
+            <div className="w-25 h-15 ">
+               <img src='https://res.cloudinary.com/dycjjaxsk/image/upload/v1768915338/Screenshot_2026-01-20_185112_cerxcq.png'/>
             </div>
             <span className="text-xl font-black bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent tracking-tight hover:from-slate-200 hover:to-white transition-all duration-200">
               Chess Crypt
