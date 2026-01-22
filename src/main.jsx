@@ -9,10 +9,11 @@ import {
             Home,
             ChessCryptFileTool,
             ChessVisualizer,
-            Team,
+            TeamProfile,
             VisualizationBanner,
             IntroBanner
         } from "./components/index"
+import TeamProfile from "./pages/TeamProfile";
 
 
 const router = createBrowserRouter(
@@ -23,7 +24,7 @@ const router = createBrowserRouter(
         <Route path='/encrypt/try' element={<ChessCryptFileTool/>}/>
         <Route path='/visualizer' element={<VisualizationBanner/>}/>
         <Route path='/visualizer/try' element={<ChessVisualizer/>}/>
-        <Route path='/our-team' element={<Team/>}/>
+        <Route path='/our-team' element={<TeamProfile/>}/>
       </Route>
     )
 )

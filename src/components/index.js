@@ -2,7 +2,7 @@ import Layout from "./Layout";
 import Home from "./Home";
 import ChessCryptFileTool from "@/pages/ChessCryptFileTool";
 import ChessVisualizer from "../pages/ChessVisualizer"
-import Team from "./Team";
+import TeamProfile from "./Team";
 import VisualizationBanner from "./Visualization/VisualizationBanner";
 import IntroBanner from "./Visualization/IntroBanner";
 import Header from "./Header/Header";
@@ -18,7 +18,7 @@ export {
             Home,
             ChessCryptFileTool,
             ChessVisualizer,
-            Team,
+            TeamProfile,
             VisualizationBanner,
             IntroBanner,
 
