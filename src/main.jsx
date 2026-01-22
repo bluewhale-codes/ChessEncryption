@@ -13,7 +13,7 @@ import {
             VisualizationBanner,
             IntroBanner
         } from "./components/index"
-import TeamProfile from "./pages/TeamProfile";
+
 
 
 const router = createBrowserRouter(
