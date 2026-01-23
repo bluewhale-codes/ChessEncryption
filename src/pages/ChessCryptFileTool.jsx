@@ -47,8 +47,8 @@ export default function ChessCryptFileTool() {
 
     const url =
       action === "encode"
-        ? "http://127.0.0.1:8000/encode"
-        : "http://127.0.0.1:8000/decode";
+        ? "/encode"
+        : "/decode";
 
      const res = await api.post(url, formData, {
       responseType: "blob",

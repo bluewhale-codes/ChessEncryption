@@ -3,7 +3,7 @@ import axios from "axios"
 import { toast } from "react-toastify"
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL: "https://chess-encryption-api-production.up.railway.app/",
   timeout: 120000,
 })
 
